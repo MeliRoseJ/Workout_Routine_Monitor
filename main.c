@@ -31,158 +31,180 @@
 */
 
 // other (global) variables found in setup.h
-int i, j, k; // loop variables
+uint8_t i, j, k; // loop variables
 
 void setup() {
 	// Instead of setting up individual timers, millis will be used to 
 	// determine if a certain time has passed
 
-	// ATmega32U4 default clock source is 1MHz system clock with 8MHz crystal
-	// With CTC, OCRnx = f_clk_IO / (prescaler * desired frequency) - 1, 
-	// so there is a compare match at that value
+	CircuitPlayground.setBrightness(100);
+	
+	repetitionNum = 10; // default exercise length
+	for (i = 0; i < sizeof(exerciseArr); i++)
+		exerciseArr[i] = NULL; // OFF_COLOR; ****** fix
+			
+	sysState = RESET_EXERCISE;
 
-	// Timer1 will be used to refresh the display every 1/10th second (10 Hz), 
-	// so the minimum prescaler needed is 64. OCR1A used as TOP so = 12499 
-	TCCR1A = 0b00000000; // All ports disconnected, WGM in CTC (0b01[00])
-	TCCR1B = 0b00001011; // WGM in CTC (0b[01]00), prescaler to 64
-	TCCR1C = 0b00000000; // Don't force output compare 
-
-	OCR1AH = (12499 >> 8); // upper 8 bits
-	OCR1AL = (12499 & 0xFF); // lower 8 bits
-
-	TIMSK1 = 0b00000010; // the display interrupt will always run if interrupts are enabled
-	// Later, to enable interrupts on OCR1A match, TIMSK1 |= (1 << 1)
-
-	// Timer2 will be used to sample the accelerometer. The sample rate will be
-	// 100Hz (10ms), so the minimum prescaler needed is 8. So OCR2A = 9999
-	TCCR2A = 0b00000000; // All ports disconnected, WGM in CTC (0b01[00])
-	TCCR2B = 0b00001010; // WGM in CTC (0b[01]00), prescaler to 8
-	TCCR2C = 0b00000000; // Don't force output compare 
-
-	OCR2AH = (9999 >> 8); // upper 8 bits of 9999
-	OCR2AL = (9999 & 0xFF); // lower 8 bits of 9999
-
-	// Timer interrupts will be enabled in RESET state
-	//TIMSK2 = 0b00000000; // for now interrupts turned off.
-	// Later, to enable interrupts on OCR2A match, TIMSK2 |= (1 << 1)
-
-	// // Timer3 will be as a timeout for if the user is idle during certain 
-	// // states. These timeouts will be several seconds long, so the best 
-	// // prescaler is 1024. The timer will be reset with each new state that 
-	// // uses it, and each state will use a different OCR interrupt.
-
-	// // OCR3A will be 2 sec, OCR3B will be 4 sec, and OCR3C will be 6 sec
-	// // The MAX or TOP will be about 8.4 sec (a bit short of that)
-	// TCCR3A = 0b00000000; // All ports disconnected, WGM in Normal (0b00[00])
-	// TCCR3B = 0b00000101; // WGM in normal (0b[00]00), prescaler to 1024
-	// TCCR3C = 0b00000000; // Don't force output compare
-
-	// OCR3AH = (23437 >> 8); // upper 8 bits
-	// OCR3AL = (23437 & 0xFF); // lower 8 bits
-	// OCR3BH = (31249 >> 8); // upper 8 bits
-	// OCR3BL = (31249 & 0xFF); // lower 8 bits
-	// OCR3CH = (46874 >> 8); // upper 8 bits
-	// OCR3CL = (46874 & 0xFF); // lower 8 bits
-
-	// // Timer interrupts will be enabled in RESET state
-	// // TIMSK3 = 0b00000000; // for now interrupts turned off.
-	// // Later, to enable interrupts on match:
-	// // OVF -> TIMSK3 |= (1 << 0), OCR3A -> TIMSK3 |= (1 << 1), 
-	// // OCR3B -> TIMSK3 |= (1 << 2), OCR3C -> TIMSK3 |= (1 << 3)
-
-	// setBrightness(100);
-	sysState = SETUP;
 }
 
 void loop() {
 	switch(sysState){
-		case RESET:
-			cli(); // don't allow interrupts while resetting
-			exerciseLength = 10; // default exercise length
+		case RESET_EXERCISE:
+			debounceObj = NULL;
+			timeout_start = 0;
+			timeout_curr = 0;
+
 			currColor = OFF_COLOR;
 			numDisplayed = 0;
 			
-			exerciseNum = 0;
-			for (i = 0; i < sizeof(exerciseArr); i++)
-				exerciseArr[i] = NONE;
+			lastCharacteristic = NULL; //{NULL, NULL, NULL};
+			currCharacteristic = NULL; //{NULL, NULL, NULL};
+			matchCharacteristic = 0;
 			
-			for (i = 1; i < sizeof(currDisplay); i++)
-				currDisplay[i] = OFF_COLOR;
+			repetitionCompleted = 0;
+			exerciseArr[exerciseNum] = NULL;
 			
-			TIMSK1 = 0b00000010; // turn on display interrupt
-			TIMSK2 = 0b00000000; // for now interrupts turned off.
-			// TIMSK3 = 0b00000000; // for now interrupts turned off.
-
 			sysState = READY;
-			sei(); // enable interrupts
 			break;
 
 		case READY:
-			if (rightButton() && !exerciseNum) { 
-				sysState = INPUT_LENGTH;
-				timeout_start = millis();
-				// TCNT3 = 0; // reset timer
-				// TIMSK3 |= (1 << 2); // begin 4 sec timeout counter
+			updateDisplay_statusLEDs(READY_COLOR);
+
+			timeout_curr = millis() - timeout_start;
+
+			// right button pressed and left button not being debounced
+			if (i = debounceRight()){
+				if (i == 2)
+					sysState = CHANGE_REPETITIONS;
 			}
-			else if (leftButton()) {
-				sysState = MEASURING;
-				timeout_start = millis();
-				// TCNT3 = 0; // reset timer
-				// TIMSK3 |= (1 << 2); // begin 4 sec timeout counter
+			// left button pressed and right button not being debounced
+			else if (i = debounceLeft()){
+				if (i == 2)
+					sysState = MEASURING;
 			}
-			
+			// if no buttons pressed at end of debounce time, debounce failed
+			else if (timeout_start >= debounce_time) { 
+				debounceObj = NULL;
+				timeout_start = 0;
+			}
 			break;
 
-		case INPUT_LENGTH:
-			// fix this somehow. logic is wrong i know it
-			if ((millis() - timeout_start) >= four_sec_timeout)
-				sysState = READY;
-				break;
-			
-			else if (leftButton() && (exerciseLength > 0)) {
-				exerciseLength--;
-				if (!(exerciseLength%10))
-					numDisplayed = 10;
+		case CHANGE_REPETITIONS:
+			// determine display values
+			if(!(displayNum = repetitionNum % 10))
+				displayNum = 10;
 
-				if (exerciseLength <= 10) 
-					currColor = ONES;
-				else if (exerciseLength <= 20)
-					currColor = TENS;
-				else if (exerciseLength <= 30)
-					currColor = TWENTIES;
-				else currColor = THIRTIES; 
+			if (repetitionNum <= 10) 
+				displayColor = ONES_COLOR;
+			else if (repetitionNum <= 20)
+				displayColor = TENS_COLOR;
+			else if (repetitionNum <= 30)
+				displayColor = TWENTIES_COLOR;
+			else displayColor = THIRTIES_COLOR; 
+
+			updateDisplay_oneColor(displayColor, displayNum);
+			timeout_curr = millis() - timeout_start;
+
+			if (i = debounceLeft()) {
+				if (i == 2 &&(repetitionNum > 0))
+					repetitionNum++;
 			}
-			else if (rightButton() && (exerciseLength < 41)) {
-				exerciseLength++;
-				numDisplayed = exerciseLength%10;
-				if (exerciseLength <= 10) 
-					currColor = ONES;
-				else if (exerciseLength <= 20)
-					currColor = TENS;
-				else if (exerciseLength <= 30)
-					currColor = TWENTIES;
-				else currColor = THIRTIES; 
+			else if (i = debounceRight()) {
+				if (i == 2 && (repetitionNum < 41))
+					repetitionNum--;
 			}
-			// else if (leftButton() || rightButton())
-			// 	timeout_start = millis();
+			else if (debounceObj && (timeout_curr >= debounce_time)) {
+				debounceObj = NULL;
+				timeout_start = 0;
+			}
+			// if no debounce is happening & no buttons pressed for 4 seconds
+			else if (!debounceObj && (timeout_curr >= four_sec_timeout)) {
+				timeout_start = 0;
+				sysState = READY;
+			}
 			break;
 
 		case MEASURING:
-			// should also set currColor = exercise color
-			break;
-		case IN_PROGRESS:
-			if (leftButton()) {
-				if ((millis() - timeout_start) >= two_sec_timeout){
+			updateDisplay_statusLEDs(MEASURING_COLOR);
+
+			// *********** note be careful ab timeout start being zero. 
+			// *********** millis() - 0 is probably bigger than debounce_time
+			timeout_curr = millis() - timeout_start;
+			if (i == debounceLeft()){
+				if (i == 2) {
 					sysState = READY;
-					break;
 				}
 			}
-			else if (currMovement != prevMovement) {
-			///////////////////////////////////
+			else if (debounceObj && (timeout_curr >= debounce_time)){
+				debounceObj = NULL;
+				timeout_start = 0;
+			}
+			else { // measure movement
+				if (timeout_curr >= sample_time){
+					sampleArr[sampleCount] = getAcceleration(); // getCharacteristic
+					sampleCount++;
+					timeout_start = 0;
+				}
+				else if (sampleCount == sample_size){ // if or else if??
+					if(currExercise = getExercise()) {
+						// add condition if excercise has already been done
+						exerciseArr[exerciseNum] = currExercise;
+						// repetitionCompleted
+						// exerciseNum++; // don't increment until complete
+						sysState = EXERCISE_IN_PROGRESS;
+					}
+					else sampleCount = 0; // restart if unidentifiable
+				}
+			}
 			break;
-		case COMPLETE:
+
+		case EXERCISE_IN_PROGRESS:
+			displayColor = currExercise.color;
+			displayNum = (repetitionCompleted/repetitionNum)*10;
+			updateDisplay_oneColor(displayColor, displayNum);
+			
+			// *********** note be careful ab timeout start being zero. 
+			// *********** millis() - 0 is probably bigger than debounce_time
+			timeout_curr = millis() - timeout_start;
+			if (i == debounceLeft()){
+				if (i == 2) {
+					sysState = READY;
+				}
+			}
+			else if (debounceObj && (timeout_curr >= debounce_time)){
+				debounceObj = NULL;
+				timeout_start = 0;
+			}
+			else { // count movements
+				/////////////////////////////////////////////////
+				if (repetitionCompleted == repetitionNum){
+					exerciseNum++;
+					sysState = EXERCISE_COMPLETE;
+				}
+			}
 			break;
+
+		case EXERCISE_COMPLETE:
+			updateDisplay_oneColor(COMPLETE_COLOR, 10);
+			timeout_curr = millis() - timeout_start;
+
+			if (timeout_curr >= four_sec_timeout)
+				sysState = READY;
+
+			break;
+
+		case ROUTINE_COMPLETE:
+			updateDisplay_statusLEDs(COMPLETE_COLOR);
+			// sysState = ROUTINE_COMPLETE;
+			break;
+		
 		case ERROR:
+			updateDisplay_statusLEDs(ERROR_COLOR);
+
+			timeout_curr = millis() - timeout_start;
+
+			if (timeout_curr >= four_sec_timeout)
+				sysState = RESET_EXERCISE;
 			break;
 	}
 }

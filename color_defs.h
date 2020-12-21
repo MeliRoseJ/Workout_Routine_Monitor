@@ -1,7 +1,7 @@
 // Melissa Jacob - mrj310 - Embedded Challenge Fall 2020
 // color setup
-#ifndef COLORS_H
-#define COLORS_H
+#ifndef COLOR_DEFS_H
+#define COLOR_DEFS_H
 
 // Neopixel colors go from 0 to 255.
 
@@ -26,6 +26,7 @@ typedef struct { // RGB color information for a neopixel
 #define WHITE ((neopixel_color) {255, 255, 255})
 
 // Status LED color definitions
+#define RESET_COLOR ((neopixel_color) YELLOW)
 #define READY_COLOR ((neopixel_color) GREEN)
 #define ERROR_COLOR ((neopixel_color) RED)
 #define MEASURING_COLOR ((neopixel_color) BLUE)
@@ -38,9 +39,9 @@ typedef struct { // RGB color information for a neopixel
 #define SQUAT_COLOR ((neopixel_color) PINK)
 
 // Repetition count level color definitions
-#define ONES ORANGE
-#define TENS YELLOW
-#define TWENTIES CYAN
-#define THRITIES PURPLE
+#define ONES_COLOR ORANGE
+#define TENS_COLOR YELLOW
+#define TWENTIES_COLOR CYAN
+#define THRITIES_COLOR PURPLE
 
 #endif

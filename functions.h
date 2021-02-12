@@ -4,21 +4,46 @@
 #ifndef FUNCTIONS_H
 #define FUNCTIONS_H
 
+#include "embedded_challenge.h"
+
 // display the status LEDs
-//void updateDisplay_statusLEDs(neopixel_color statusColor, neopixel_color exerciseColors[4]);
 void updateDisplay_statusLEDs(neopixel_color statusColor);
+
 // display a single color with varying number of LEDs on
-void updateDisplay_oneColor(neopixel_color color, uint8_t numLEDs);
-// void updateDisplay_oneColor();
+void updateDisplay_oneColor();
 
-// begins the debounce process if necessary. returns 1 if button is in the process of debouncing or has finished debouncing. Returns 0 if it is not the button currently being debounced, or if it is unpressed (the debounce process cannot be begun)
-// bool debounceLeft(sys_state stateIfDebounced);
-// bool debounceRight(sys_state stateIfDebounced);
+// get current time. return millis() - start if start is not 0, else return 0
+void setCurrTime();
+
 // return 0 if can't debounce or not pressed, return 1 if in process, return 2 if complete
-uint8_t debounceLeft();
-uint8_t debounceRight();
+int checkLeftDebounce();
+int checkRightDebounce();
 
-acceleration_axes getAcceleration();
-accel_characteristic getCharacteristic();
-exercise getExercise();
+void getAcceleration();
+// void getCharacteristic();
+
+void getExercise();
+// void updatePercentChar();
+accel_axes getAccelAvg();
+int meetsThreshold(accel_axes avg, accel_axes thresh);
+
+// operators
+// int operator==(accel_characteristic a, accel_characteristic b);
+// int operator!=(accel_characteristic a, accel_characteristic b);
+
+// int operator==(percent_characteristic a, percent_characteristic b);
+// int operator!=(percent_characteristic a, percent_characteristic b);
+// int operator<=(percent_characteristic a, percent_characteristic b);
+// int operator>=(percent_characteristic a, percent_characteristic b);
+
+int operator==(accel_axes a, accel_axes b);
+int operator!=(accel_axes a, accel_axes b);
+int operator<=(accel_axes a, accel_axes b);
+int operator>=(accel_axes a, accel_axes b);
+
+int operator==(exercise a, exercise b);
+int operator!=(exercise a, exercise b);
+
+int operator==(neopixel_color a, neopixel_color b);
+int operator!=(neopixel_color a, neopixel_color b);
 #endif
